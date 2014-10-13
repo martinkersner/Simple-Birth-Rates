@@ -2,12 +2,14 @@ globals
 [
   women-count
   men-count
+  binary-length
 ]
 
 turtles-own
 [
   age
   appearance
+  intelligence
 ]
 
 breed [women woman]
@@ -16,11 +18,10 @@ breed [men man]
 to setup
   clear-output
   setup-experiment
-  print crg
 end
 
 to setup-experiment
-  cp ct ;clear patches, clear turtles
+  cp ct
   clear-all-plots
   reset-ticks
   
@@ -31,6 +32,7 @@ to setup-experiment
     set size 2
     set age 0
     set appearance crg
+    set intelligence crg
   ]
   
   create-men men-capacity [
@@ -39,7 +41,10 @@ to setup-experiment
     set size 2
     set age 0
     set appearance crg
+    set intelligence crg    
   ]
+  
+  set binary-length 10
 end
 
 to go
@@ -47,6 +52,7 @@ to go
   reproduce
   get-older
   pass-away
+  selection
   tick
 end
 
@@ -63,37 +69,50 @@ to reproduce
   [    
     if (count men-here = 1) and (count women-here = 1)
     [
-      let ma 0
-      let wa 0
-      ask men [set ma appearance]
-      ask women [set wa appearance]
+      let age-man 0
+      let age-woman 0
+      ask men [set age-man age]
+      ask women [set age-woman age]
       
-      
-      if ((hamming-distance ma  wa) < 4)
+      if (age-man >= 15) and (age-woman >= 15)
       [
-        ask turtles-here 
-        [
-          let kc kids-count
-          let gr gender-random
+        let ma 0
+        let wa 0
+        ask men [set ma appearance]
+        ask women [set wa appearance]
         
-          ifelse (gr = "women") 
-          [ hatch-women kc 
-            [
-              set color red
-              set appearance crg
-              ;set appearance random 10
-            ] 
-          ]
-          [ hatch-men kc 
-            [
-              set color blue
-              set appearance crg
-              ;set appearance random 10
-            ] 
+        let mi 0
+        let wi 0
+        ask men [set mi intelligence]
+        ask women [set wi intelligence]
+      
+        if ((genom-diff ma  wa) < appearance-diff) and ((genom-diff mi  wi) < intelligence-diff)
+        [
+          ask turtles-here 
+          [
+            let kc kids-count
+            let gr gender-random
+          
+            ifelse (gr = "women") 
+            [ hatch-women kc 
+              [
+                set color red
+                set age 0
+                set appearance cross&mutate wa ma
+                set intelligence cross&mutate wi mi
+              ] 
+            ]
+            [ hatch-men kc 
+              [
+                set color blue
+                set age 0
+                set appearance cross&mutate ma wa
+                set intelligence cross&mutate mi wi
+              ] 
+            ]
           ]
         ]
       ]
-      
     ]
   ]
 end
@@ -101,7 +120,18 @@ end
 ; people are getting older at each tick of clock
 to get-older
   ask turtles 
-  [ set age age + 1 ]
+  [ 
+    set age age + 1
+    
+    ifelse (age <= 25)
+    [set appearance fill-binary integer-to-binary ((binary-to-integer appearance) + appearance-plus-minus)]
+    [set appearance fill-binary integer-to-binary ((binary-to-integer appearance) - appearance-plus-minus)]
+    
+    
+    ifelse (age <= 55)
+    [set intelligence fill-binary integer-to-binary ((binary-to-integer intelligence) + intelligence-plus-minus)]
+    [set intelligence fill-binary integer-to-binary ((binary-to-integer intelligence) - intelligence-plus-minus)]    
+  ]
 end
 
 to pass-away
@@ -109,7 +139,7 @@ to pass-away
   [
     if (age > die-random) [ die ]
     
-    if (count turtles < 0) [ stop ]
+    if (women-count <= 0) [ stop ]
   ]
 end
 
@@ -134,9 +164,22 @@ to-report die-random
   report random-normal 67.2 13
 end
 
-;to-report binary-to-integer [bits] 
-;  report reduce [?1 * 2 + ?2] bits 
-;end
+to-report binary-to-integer [bits] 
+  report reduce [?1 * 2 + ?2] bits 
+end
+
+to-report integer-to-binary [integer]
+  let bits remainder integer 2
+  set integer floor (integer / 2)
+
+  while [integer > 0]
+  [
+    set bits sentence (remainder integer 2) bits
+    set integer floor (integer / 2)
+  ]
+  
+  report bits
+end
 
 ; create genom with 10 binary numbers 
 ; used for appearance
@@ -148,14 +191,83 @@ end
 to-report hamming-distance [g1 g2]
   let d 0
   
-  (foreach g1 g2 [ set d d + (abs ?1 - ?2) ])
+  (foreach g1 g2 [ set d d + (abs (?1 - ?2)) ])
   
   report d
 end
 
-to-report mutate [g1 g2]
+; assumes that both g1 and g2 have same length
+to-report cross&mutate [g1 g2]
   let l length g1
-  let p random
+  let p random l ; point of crossing
+  
+  let i 1
+  let g_new item i g1
+  
+  foreach g1 
+  [
+    if (i <= p) 
+    [ set g_new sentence g_new item i g1 ]
+    
+    set i i + 1
+   ]
+  
+  let j 0
+  foreach g2 
+  [
+    if (j > p) 
+    [ set g_new sentence g_new item j g2 ]
+    
+    set j j + 1
+   ]
+  
+  set g_new mutate g_new
+  
+  report g_new
+end
+
+to-report mutate [l]
+  let i random binary-length
+  let v random 2
+  
+  report replace-item i l v
+end
+
+to selection
+  let count-all count turtles
+
+  if count-all > max-capacity
+  [
+    let count-kill abs (count-all - max-capacity)
+    ask min-n-of count-kill turtles [binary-to-integer appearance]
+    [ die ] 
+  ]
+end
+
+to-report genom-diff [g1 g2]
+  let i1 binary-to-integer g1
+  let i2 binary-to-integer g2
+  
+  report abs (i1 - i2)
+end
+
+; fills with zeros to full binary number
+to-report fill-binary [g]
+  let l 0
+  
+  ifelse (is-list? g)
+  [set l length g]
+  [
+    if (g = 0) or (g = 1) [set l 1]
+  ]
+    
+  while [l < binary-length]
+  [
+   set g sentence 0 g
+   set l (l + 1) 
+  ]
+  
+  report g
 end
 
 ; Copyright 1997 Uri Wilensky.
@@ -188,26 +300,11 @@ GRAPHICS-WINDOW
 ticks
 30.0
 
-SLIDER
-10
-63
-248
-96
-carrying-capacity
-carrying-capacity
-1
-4000
-1000
-1
-1
-turtles
-HORIZONTAL
-
 BUTTON
-6
-26
 66
-59
+79
+126
+112
 setup
 setup
 NIL
@@ -221,10 +318,10 @@ NIL
 1
 
 BUTTON
-70
-26
 130
-59
+79
+190
+112
 go
 go
 T
@@ -236,36 +333,6 @@ NIL
 NIL
 NIL
 1
-
-SLIDER
-13
-135
-251
-168
-red-fertility
-red-fertility
-0.0
-10.0
-2
-0.1
-1
-children
-HORIZONTAL
-
-SLIDER
-12
-99
-250
-132
-blue-fertility
-blue-fertility
-0.0
-10.0
-2
-0.1
-1
-children
-HORIZONTAL
 
 PLOT
 4
@@ -288,10 +355,10 @@ PENS
 "Total" 1.0 0 -10899396 true "" "plot count turtles"
 
 MONITOR
-748
-178
-824
-223
+718
+95
+794
+140
 # women
 women-count
 3
@@ -299,48 +366,116 @@ women-count
 11
 
 MONITOR
-851
-177
-928
-222
+814
+96
+891
+141
 # men
 men-count
 3
 1
 11
 
-OUTPUT
-290
-449
-602
-543
-12
-
 SLIDER
-756
-63
-928
-96
+716
+13
+888
+46
 men-capacity
 men-capacity
 0
 1000
-100
+250
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-759
-113
-931
-146
+717
+53
+889
+86
 women-capacity
 women-capacity
 0
 1000
+250
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+720
+149
+892
+182
+appearance-diff
+appearance-diff
+0
+1024
+717
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+723
+237
+895
+270
+max-capacity
+max-capacity
+0
+2000
+500
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+721
+193
+893
+226
+intelligence-diff
+intelligence-diff
+0
+1024
+730
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+909
+148
+1135
+181
+appearance-plus-minus
+appearance-plus-minus
+0
 100
+12
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+912
+194
+1133
+227
+intelligence-plus-minus
+intelligence-plus-minus
+0
+100
+9
 1
 1
 NIL
