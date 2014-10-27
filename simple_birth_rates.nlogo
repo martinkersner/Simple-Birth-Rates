@@ -25,7 +25,7 @@ to setup-experiment
   clear-all-plots
   reset-ticks
   
-  ; create people
+  ; initialize women
   create-women women-capacity [
     setxy random-xcor random-ycor
     set color red
@@ -35,6 +35,7 @@ to setup-experiment
     set intelligence crg
   ]
   
+  ; initialize men
   create-men men-capacity [
     setxy random-xcor random-ycor
     set color blue    
@@ -44,9 +45,11 @@ to setup-experiment
     set intelligence crg    
   ]
   
+  ; length of genom
   set binary-length 10
 end
 
+; repeating procedure of life
 to go
   move
   reproduce
@@ -56,6 +59,7 @@ to go
   tick
 end
 
+; perform move in each life cycle
 to move
   ask turtles 
   [
@@ -66,7 +70,7 @@ end
 
 to reproduce
   ask patches 
-  [    
+  [ ; men and women require private, they cannot share a patch with anybody else   
     if (count men-here = 1) and (count women-here = 1)
     [
       let age-man 0
@@ -74,38 +78,48 @@ to reproduce
       ask men [set age-man age]
       ask women [set age-woman age]
       
+      ; people older than 15 years old can reproduce
       if (age-man >= 15) and (age-woman >= 15)
       [
+        ; get appearance of man and woman
         let ma 0
         let wa 0
         ask men [set ma appearance]
         ask women [set wa appearance]
         
+        ; get intelligence of man and woman
         let mi 0
         let wi 0
         ask men [set mi intelligence]
         ask women [set wi intelligence]
       
+        ; the difference of intelligence and appearance between man and woman cannot exceed set maximum differences
         if ((genom-diff ma  wa) < appearance-diff) and ((genom-diff mi  wi) < intelligence-diff)
         [
           ask turtles-here 
-          [
+          [; generate random number of kids and their gender
             let kc kids-count
             let gr gender-random
           
+            ; create new women
             ifelse (gr = "women") 
             [ hatch-women kc 
               [
                 set color red
                 set age 0
+
+                ; cross and mutate appearance/intelligence of mother and father
                 set appearance cross&mutate wa ma
                 set intelligence cross&mutate wi mi
               ] 
             ]
+            ; create new man
             [ hatch-men kc 
               [
                 set color blue
                 set age 0
+                
+                ; cross and mutate appearance/intelligence of mother and father
                 set appearance cross&mutate ma wa
                 set intelligence cross&mutate mi wi
               ] 
@@ -123,17 +137,19 @@ to get-older
   [ 
     set age age + 1
     
+    ; people are getting prettier until 25 years old, then their appearance is getting lower
     ifelse (age <= 25)
     [set appearance fill-binary integer-to-binary ((binary-to-integer appearance) + appearance-plus-minus)]
     [set appearance fill-binary integer-to-binary ((binary-to-integer appearance) - appearance-plus-minus)]
     
-    
+    ; people are getting wiser until 25 years old, then their intelligence is getting lower
     ifelse (age <= 55)
     [set intelligence fill-binary integer-to-binary ((binary-to-integer intelligence) + intelligence-plus-minus)]
     [set intelligence fill-binary integer-to-binary ((binary-to-integer intelligence) - intelligence-plus-minus)]    
   ]
 end
 
+; test if person should die according to generated life span
 to pass-away
   ask turtles 
   [
@@ -143,6 +159,7 @@ to pass-away
   ]
 end
 
+; generate number of kids
 to-report kids-count
   let _mean 1
   let _std  2
@@ -164,10 +181,12 @@ to-report die-random
   report random-normal 67.2 13
 end
 
+; convert binary number to integer
 to-report binary-to-integer [bits] 
   report reduce [?1 * 2 + ?2] bits 
 end
 
+; convert integer to binary number
 to-report integer-to-binary [integer]
   let bits remainder integer 2
   set integer floor (integer / 2)
@@ -196,6 +215,7 @@ to-report hamming-distance [g1 g2]
   report d
 end
 
+; cross and mutate two given genoms
 ; assumes that both g1 and g2 have same length
 to-report cross&mutate [g1 g2]
   let l length g1
@@ -233,6 +253,7 @@ to-report mutate [l]
   report replace-item i l v
 end
 
+; selection of new population according to appearance
 to selection
   let count-all count turtles
 
@@ -244,6 +265,8 @@ to selection
   ]
 end
 
+; counts the difference between two binary number
+; the difference is counted with decimal numbers
 to-report genom-diff [g1 g2]
   let i1 binary-to-integer g1
   let i2 binary-to-integer g2
@@ -251,7 +274,7 @@ to-report genom-diff [g1 g2]
   report abs (i1 - i2)
 end
 
-; fills with zeros to full binary number
+; fills binary number with zeros to full binary number
 to-report fill-binary [g]
   let l 0
   
@@ -269,9 +292,6 @@ to-report fill-binary [g]
   
   report g
 end
-
-; Copyright 1997 Uri Wilensky.
-; See Info tab for full copyright and license.
 @#$#@#$#@
 GRAPHICS-WINDOW
 290
@@ -415,7 +435,7 @@ appearance-diff
 appearance-diff
 0
 1024
-717
+500
 1
 1
 NIL
@@ -445,7 +465,7 @@ intelligence-diff
 intelligence-diff
 0
 1024
-730
+500
 1
 1
 NIL
@@ -453,14 +473,14 @@ HORIZONTAL
 
 SLIDER
 909
-148
+149
 1135
-181
+182
 appearance-plus-minus
 appearance-plus-minus
 0
 100
-12
+0
 1
 1
 NIL
@@ -475,7 +495,7 @@ intelligence-plus-minus
 intelligence-plus-minus
 0
 100
-9
+0
 1
 1
 NIL
@@ -484,64 +504,28 @@ HORIZONTAL
 @#$#@#$#@
 ## WHAT IS IT?
 
-This is a simple model of population genetics.  There are two populations, the REDS and the BLUES. Each has settable birth rates.  The reds and blues move around and reproduce according to their birth rates.  When the carrying capacity of the terrain is exceeded, some agents die (each agent has the same chance of being selected for death) to maintain a relatively constant population.  The model allows you to explore how differential birth rates affect the ratio of reds to blues.
+This is a simple model of population genetics. There are two populations, the WOMEN and the MEN. Each has settable capacity, maximum difference of appearance and intelligence
+between couples which allows a reproduction. The appearance and intelligence is changing over time. The changes can be also set. The women and men move around and if one man and women are sharing one patch at the time they can reproduce if they are similar enough. The similarity is settable. When the carrying capacity of the terrain is exceeded, some agents die (according to the lowest appearance score) to maintain a relatively constant population.  The model allows you to explore how general personality of population affect the ratio of reds to blues.
 
 ## HOW TO USE IT
 
 Each pass through the GO function represents a generation in the time scale of this model.
 
-The CARRYING-CAPACITY slider sets the carrying capacity of the terrain.  The model is initialized to have a total population of CARRYING-CAPACITY with half the population reds and half blues.
+The MAX-CAPACITY slider sets the carrying capacity of the terrain.
 
-The RED-FERTILITY and BLUE-FERTILITY sliders sets the average number of children the reds and blues have in a generation.  For example, a fertility of 3.4 means that each parent will have three children minimum, with a 40% chance of having a fourth child.
+The MEN-CAPACITY and WOMEN-CAPACITY sliders set the initial number of men and women have after first intitialization.
 
-The # BLUES and # REDS monitors display the number of reds and blues respectively.
+The APPEARANCE-DIFF (INTELLIGENCE-DIFF) sliders set maximum allowed difference between appearance (intelligence) of man and women if they want to reproduce.
 
-The GO button runs the model.  A running plot is also displayed of the number of reds, blues and total population (in green).
+The APPEARANCE-PLUS-MINUS (INTELLIGENCE-PLUS-MINUS) denotes change of appearance (intelligence) at each tick. Appearance increases until age of 25, then decreases. Intelligence increases until age of 55, then decreases.
 
-The RUN-EXPERIMENT button lets you experiment with many trials at the same settings.  This button outputs the number of ticks it takes for either the reds or the blues to die out given a particular set of values for the sliders.  After each extinction occurs, the world is cleared and another run begins with the same settings.  This way you can see the variance of the number of generations until extinction.
+The # WOMEN and # MEN monitors display the number of reds and blues respectively.
 
-## THINGS TO NOTICE
-
-How does differential birth rates affect the population dynamics?
-
-Does the population with a higher birth rate always start off growing faster?
-
-Does the population with a lower birth rate always end up extinct?
-
-## THINGS TO TRY
-
-Try running an experiment with the same settings many times.
-Does one population always go extinct? How does the number of generations until extinction vary?
-
-## EXTENDING THE MODEL
-
-In this model, once the carrying capacity has been exceeded, every member of the population has an equal chance of dying. Try extending the model so that reds and blues have different saturation rates. How does the saturation rate compare with the birthrate in determining the population dynamics?
-
-In this model, the original population is set to the carrying capacity (both set to CARRYING-CAPACITY). Would population dynamics be different if these were allowed to vary independently?
-
-In this model, reds are red and blues blue and progeny of reds are always red, progeny of blues are always blue. What if you allowed reds to sometimes have blue progeny and vice versa? How would the model dynamics be different?
-
-
-## HOW TO CITE
-
-If you mention this model in a publication, we ask that you include these citations for the model itself and for the NetLogo software:
-
-* Wilensky, U. (1997).  NetLogo Simple Birth Rates model.  http://ccl.northwestern.edu/netlogo/models/SimpleBirthRates.  Center for Connected Learning and Computer-Based Modeling, Northwestern University, Evanston, IL.
-* Wilensky, U. (1999). NetLogo. http://ccl.northwestern.edu/netlogo/. Center for Connected Learning and Computer-Based Modeling, Northwestern University, Evanston, IL.
+The GO button runs the model.  A running plot is also displayed of the number of women (red), men (blue) and total population (in green).
 
 ## COPYRIGHT AND LICENSE
 
-Copyright 1997 Uri Wilensky.
-
-![CC BY-NC-SA 3.0](http://i.creativecommons.org/l/by-nc-sa/3.0/88x31.png)
-
-This work is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 3.0 License.  To view a copy of this license, visit http://creativecommons.org/licenses/by-nc-sa/3.0/ or send a letter to Creative Commons, 559 Nathan Abbott Way, Stanford, California 94305, USA.
-
-Commercial licenses are also available. To inquire about commercial licenses, please contact Uri Wilensky at uri@northwestern.edu.
-
-This model was created as part of the project: CONNECTED MATHEMATICS: MAKING SENSE OF COMPLEX PHENOMENA THROUGH BUILDING OBJECT-BASED PARALLEL MODELS (OBPML).  The project gratefully acknowledges the support of the National Science Foundation (Applications of Advanced Technologies Program) -- grant numbers RED #9552950 and REC #9632612.
-
-This model was converted to NetLogo as part of the projects: PARTICIPATORY SIMULATIONS: NETWORK-BASED DESIGN FOR SYSTEMS LEARNING IN CLASSROOMS and/or INTEGRATED SIMULATION AND MODELING ENVIRONMENT. The project gratefully acknowledges the support of the National Science Foundation (REPP & ROLE programs) -- grant numbers REC #9814682 and REC-0126227. Converted from StarLogoT to NetLogo, 2001.
+Copyright 2014 Martin Kersner, m.kersner@gmail.com
 @#$#@#$#@
 default
 true
